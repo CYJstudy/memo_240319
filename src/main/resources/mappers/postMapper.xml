@@ -27,13 +27,13 @@
 		ORDER BY `id` DESC
 	</select>
 	
-	<insert id="insertPostCreateByUserId">
+	<insert id="insertPost" parameterType="map">
 		INSERT INTO `post`
 		(
 			`userId`
 			, `subject`
 			, `content`
-			, `file`
+			, `imagePath`
 			, `createdAt`
 			, `updatedAt`
 		)
@@ -42,7 +42,7 @@
 			#{userId}
 			, #{subject}
 			, #{content}
-			, #{file}
+			, #{imagePath}
 			, NOW()
 			, NOW()
 		)			
