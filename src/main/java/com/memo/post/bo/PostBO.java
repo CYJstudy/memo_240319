@@ -1,5 +1,6 @@
 package com.memo.post.bo;
 
+import java.util.Collections;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,11 +26,65 @@ public class PostBO {
 	@Autowired
 	private FileManagerService fileManagerService;
 	
+	// 페이징 정보 필드(limit) -- 지금은 bo에 있지만, 정석대로라면 페이지에 대한 클래스를 따로 빼는게 좋다
+	private static final int POST_MAX_SIZE = 3;
+	
 	// input: 로그인 된 사람의 userId
 	// output: List<Post>
-	public List<Post> getPostListByUserId(int userId) {
-		return postMapper.selectPostListByUserId(userId); 
+	public List<Post> getPostListByUserId(int userId, Integer prevId, Integer nextId) {
+		// 게시글 번호(게시글이 10개있을때 기준) : 10 9 8 | 7 6 5 | 4 3 2 | 1
+		// 만약 4 3 2 페이지에 있을 때
+		// 1. 다음 : 2보다 작은 3개 DESC
+		// 2. 이전 : 4보다 큰 3개 ASC => 5 6 7 => BO에서 reverse 7 6 5
+		// 3. 그냥 들어왔을때(페이징 X) : 최신순 3개 DESC
+		
+		/* 1) 현재 7 6 5 페이지에 있다고 가정했을 때, 다음(next)를 눌렀을때 쿼리문
+		select * from `post`
+		where `id` < 5
+		order by `id` desc
+		limit 3;
+		 2) 현재 4 3 2 페이지에 있다고 가정했을 때, 이전(prev)를 눌렀을때 쿼리문을 아래와 같이 짠다면, 
+		    desc가 있으므로 제일 마지막 3개인 10 9 8을 가져오게 됨
+		    따라서, desc가 아닌 asc로 가져오고, BO에서 reverse하도록 짜야함
+		select * from `post`
+		where `id` > 4
+		order by `id` desc
+		limit 3;
+		*/
+		
+		Integer standardId = null; // 기준 postId
+		String direction = null; // 방향
+		if (prevId != null) { // 2. 이전
+			standardId = prevId;
+			direction = "prev";
+			
+			List<Post> postList = postMapper.selectPostListByUserId(userId, standardId, direction, POST_MAX_SIZE);
+			// [5, 6, 7] 로 들어온 리스트가 있을때 => [7, 6, 5]로 reverse
+			Collections.reverse(postList);  // 뒤집고 저장까지 해줌
+			
+			return postList;
+			
+		} else if (nextId != null) { // 1. 다음
+			standardId = nextId;
+			direction = "next";
+		}
+		
+		// 3. 페이징 X or 1.다음을 눌렀을때
+		return postMapper.selectPostListByUserId(userId, standardId, direction, POST_MAX_SIZE); 
 	}
+	
+	// '이전'을 눌러도 이동할 페이지가 없는가?
+	public boolean isPrevLastPageByUserId(int userId, int prevId) {
+		int maxPostId = postMapper.selectPostIdByUserIdAsSort(userId, "DESC");
+		return maxPostId == prevId; // 같으면 마지막이므로 이동할 페이지 없음
+	}
+	
+	// '다음'을 눌러도 이동할 페이지가 없는가?
+	public boolean isNextLastPageByUserId(int userId, int nextId) {
+		int minPostId = postMapper.selectPostIdByUserIdAsSort(userId, "ASC");
+		return minPostId == nextId;
+	}
+	
 	
 	// input: userId, postId
 	// output: Post or null
