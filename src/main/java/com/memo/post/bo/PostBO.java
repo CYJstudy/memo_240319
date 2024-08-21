@@ -159,6 +159,7 @@ public class PostBO {
 			fileManagerService.deleteFile(post.getImagePath());
 		}
 	}
+
 }
 
 
